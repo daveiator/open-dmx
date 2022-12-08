@@ -1,0 +1,19 @@
+[package]
+name = "open_dmx"
+description = "A wrapper around the serial library to send DMX data over a serial port"
+authors = ["David Bühler"]
+repository = "https://github.com/daveiator/open-dmx"
+keywords = ["dmx", "serial","open-dmx","lighting", "enttec"]
+categories = ["api-bindings","multimedia","hardware-support"]
+edition = "2021"
+
+version = "0.1.0"
+
+[dependencies]
+serial = "0.4.0"
+
+thread-priority = { version = "0.10.0", optional = true }
+
+[features]
+default = ["thread_priority"]
+thread_priority = ["dep:thread-priority"]
