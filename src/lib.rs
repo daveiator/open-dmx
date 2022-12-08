@@ -1,4 +1,4 @@
-//! [![Latest Release](https://img.shields.io/crates/v/open-dmx?style=for-the-badge)](https://crates.io/crates/open-dmx)
+//! [![Latest Release](https://img.shields.io/crates/v/open_dmx?style=for-the-badge)](https://crates.io/crates/open_dmx) [![Documentation](https://img.shields.io/docsrs/open_dmx?style=for-the-badge)](https://docs.rs/open_dmx) [![License](https://img.shields.io/crates/l/open_dmx?style=for-the-badge)]()
 //!
 //! A wrapper around the [**serial**] library to send **DMX data** over a [SerialPort].
 //!

@@ -4,11 +4,11 @@ description = "A wrapper around the serial library to send DMX data over a seria
 authors = ["David Bühler"]
 license = "MIT"
 repository = "https://github.com/daveiator/open-dmx"
-keywords = ["dmx", "serial","open-dmx","lighting", "enttec"]
+keywords = ["dmx", "serial","open_dmx","lighting", "enttec"]
 categories = ["api-bindings","multimedia","hardware-support"]
 edition = "2021"
 
-version = "0.1.0"
+version = "0.1.1"
 
 [dependencies]
 serial = "0.4.0"
