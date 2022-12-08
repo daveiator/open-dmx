@@ -2,6 +2,7 @@
 name = "open_dmx"
 description = "A wrapper around the serial library to send DMX data over a serial port"
 authors = ["David Bühler"]
+license = "MIT"
 repository = "https://github.com/daveiator/open-dmx"
 keywords = ["dmx", "serial","open-dmx","lighting", "enttec"]
 categories = ["api-bindings","multimedia","hardware-support"]
