@@ -42,6 +42,8 @@ const TIME_BREAK_TO_DATA: time::Duration = time::Duration::new(0, 136_000);
 /// [DMX-Interface]: DMXSerial
 /// 
 /// It uses the RS-485 standard *(aka. Open DMX)* to send **DMX data** over a [SerialPort]. 
+/// 
+/// [SerialPort]: serial::SystemPort
 ///
 #[derive(Debug)]
 pub struct DMXSerial {
@@ -80,6 +82,7 @@ impl DMXSerial {
     /// 
     /// 
     /// [`set functions`]: DMXSerial::set_channel
+    /// [SerialPort]: serial::SystemPort
     /// 
     /// # Example
     /// 
