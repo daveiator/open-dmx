@@ -47,6 +47,8 @@ const TIME_BREAK_TO_DATA: time::Duration = time::Duration::new(0, 136_000);
 ///
 #[derive(Debug)]
 pub struct DMXSerial {
+    
+    name: String,
     // Array of DMX-Values which are written to the Serial-Port
     channels: ArcRwLock<[u8; DMX_CHANNELS]>,
     // Connection to the Agent-Thread, if this is dropped the Agent-Thread will stop
@@ -105,6 +107,7 @@ impl DMXSerial {
 
         // channel default created here!
         let dmx = DMXSerial {
+            name: port.as_ref().to_string_lossy().to_string(),
             channels: ArcRwLock::new([0; DMX_CHANNELS]),
             agent,
             agent_rec,
@@ -158,6 +161,25 @@ impl DMXSerial {
         let mut dmx = DMXSerial::open(port)?;
         dmx.set_sync();
         Ok(dmx)
+    }
+
+
+    /// Gets the name of the Path on which the [DMXSerial] is opened.
+    /// 
+    ///  # Example
+    /// 
+    /// Basic usage:
+    /// 
+    /// ```
+    /// # use open_dmx::DMXSerial;
+    /// # fn main() {
+    /// let mut dmx = DMXSerial::open("COM3").unwrap();
+    /// assert_eq!(dmx.name(), "COM3");
+    /// # }
+    /// ```
+    ///     
+    pub fn name(&self) -> &str {
+        &self.name
     }
 
     /// Sets the specified [`channel`] to the given [`value`].
