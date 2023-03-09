@@ -413,13 +413,7 @@ impl DMXSerialAgent {
         prefixed_data[1..].copy_from_slice(&channels);
         self.send_data(&prefixed_data)?;
 
-        #[cfg(not(profile = "release"))]
-        print!("\rTime: {:?} ", start.elapsed());
-
         thread::sleep(self.min_b2b.read().unwrap().saturating_sub(start.elapsed()));
-
-        #[cfg(not(profile = "release"))]
-        print!("Time to send: {:?}", start.elapsed());
 
         Ok(())
     }
