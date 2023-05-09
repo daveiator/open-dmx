@@ -8,7 +8,7 @@ keywords = ["dmx", "serial","open_dmx","lighting", "enttec"]
 categories = ["api-bindings","multimedia","hardware-support"]
 edition = "2021"
 
-version = "0.1.3"
+version = "1.0.0"
 
 [dependencies]
 serial = "0.4.0"
