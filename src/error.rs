@@ -1,76 +1,50 @@
 //! Error types for the library
 
 
-/// Error returned by various [methods] of [DMXSerial].
+/// Error for when the [DMXSerial] port is disconnected.
 /// 
 /// [DMXSerial]: crate::DMXSerial
 /// [methods]: crate::DMXSerial#implementations
 ///
 #[derive(Debug)]
-pub enum DMXError {
+pub struct DMXDisconnectionError;
 
-    /// The serial-port is already in use.
-    AlreadyInUse,
-
-    /// If the channel is not inside the valid channel range of [`DMX_CHANNELS`].    
-    /// 
-    /// The exact error is stored in the enum.
-    /// 
-    /// - [`DMXErrorValidity::TooLow`] if the channel is lower than `1`.
-    /// 
-    /// - [`DMXErrorValidity::TooHigh`] if the channel is higher than [`DMX_CHANNELS`].
-    /// 
-    /// [`DMX_CHANNELS`]: crate::DMX_CHANNELS
-    /// 
-    NotValid(DMXErrorValidity),
-
-    /// If there are no channels available.
-    NoChannels,
-
-    /// For custom errors.
-    Other(String), 
-}
-
-impl std::fmt::Display for DMXError {
+impl std::fmt::Display for DMXDisconnectionError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            DMXError::AlreadyInUse => write!(f, "DMX channel already in use"),
-            DMXError::NotValid(exact) => match exact {
-                DMXErrorValidity::TooHigh => write!(f, "DMX channel too high"),
-                DMXErrorValidity::TooLow => write!(f, "DMX channel too low"),
-                // _ => write!(f, "Channel is not valid ( < 1 or > 512"),
-            },
-            DMXError::NoChannels => write!(f, "No channels available"),
-            DMXError::Other(ref s) => write!(f, "{}", s),
-        }
+        write!(f, "DMX Port disconnected")
     }
 } 
 
-
-impl From<String> for DMXError {
-    fn from(err: String) -> DMXError {
-        DMXError::Other(err)
-    }
-}
-
-impl std::error::Error for DMXError {
+impl std::error::Error for DMXDisconnectionError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        None //I'm laz
+        None
     }
 }
 
-/// The exact error for [`DMXError::NotValid`].
-///
-/// # Variants
-/// 
-/// - [`DMXErrorValidity::TooLow`] if the channel is lower than `1`.
-/// 
-/// - [`DMXErrorValidity::TooHigh`] if the channel is higher than [`DMX_CHANNELS`].
-/// 
-/// [`DMX_CHANNELS`]: crate::DMX_CHANNELS
-/// 
+    /// Error for when the channel is not inside the valid channel range of [`DMX_CHANNELS`].
+    /// 
+    /// - [`DMXChannelValidityError::TooLow`] if the channel is lower than `1`.
+    /// 
+    /// - [`DMXChannelValidityError::TooHigh`] if the channel is higher than [`DMX_CHANNELS`].
+    /// 
+    /// [`DMX_CHANNELS`]: crate::DMX_CHANNELS
 #[derive(Debug)]
-pub enum DMXErrorValidity {
+pub enum DMXChannelValidityError {
     TooHigh,
     TooLow,
+}
+
+impl std::fmt::Display for DMXChannelValidityError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            DMXChannelValidityError::TooHigh => write!(f, "DMX channel too high"),
+            DMXChannelValidityError::TooLow => write!(f, "DMX channel too low"),
+        }
+    }
+}
+
+impl std::error::Error for DMXChannelValidityError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        None
+    }
 }

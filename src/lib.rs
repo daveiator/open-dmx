@@ -65,22 +65,22 @@ pub const DMX_CHANNELS: usize = 512;
 ///
 /// # Errors
 ///
-/// Returns an [DMXError] of variant [`DMXError::NotValid()`] if the channel is not valid.
+/// Returns an [`DMXChannelValidityError`] if the channel is not valid.
 /// 
-/// - [`DMXErrorValidity::TooLow`] if the channel is lower than `1`.
+/// - [`DMXChannelValidityError::TooLow`] if the channel is lower than `1`.
 /// 
-/// - [`DMXErrorValidity::TooHigh`] if the channel is higher than `512`.
+/// - [`DMXChannelValidityError::TooHigh`] if the channel is higher than `512`.
 ///
-/// [DMXError]: error::DMXError
-/// [`DMXError::NotValid()`]: error::DMXError::NotValid
-/// [`DMXErrorValidity::TooLow`]: error::DMXErrorValidity::TooLow
-/// [`DMXErrorValidity::TooHigh`]: error::DMXErrorValidity::TooHigh
-pub fn check_valid_channel(channel: usize) -> Result<(), error::DMXError> {
+/// [DMXChannelValidityError]: error::DMXChannelValidityError
+/// [`DMXChannelValidityError`]: error::DMXChannelValidityError
+/// [`DMXChannelValidityError::TooLow`]: error::DMXChannelValidityError::TooLow
+/// [`DMXChannelValidityError::TooHigh`]: error::DMXChannelValidityError::TooHigh
+pub fn check_valid_channel(channel: usize) -> Result<(), error::DMXChannelValidityError> {
     if channel > crate::DMX_CHANNELS {
-        return Err(error::DMXError::NotValid(error::DMXErrorValidity::TooHigh));
+        return Err(error::DMXChannelValidityError::TooHigh);
     }
     if channel < 1 {
-        return Err(error::DMXError::NotValid(error::DMXErrorValidity::TooLow));
+        return Err(error::DMXChannelValidityError::TooLow);
     }
     Ok(())
 }
