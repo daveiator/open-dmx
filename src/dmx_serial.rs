@@ -4,7 +4,7 @@ use thread_priority;
 
 use crate::thread::*;
 use crate::check_valid_channel;
-use crate::error::DMXError;
+use crate::error::{DMXDisconnectionError, DMXChannelValidityError};
 use crate::DMX_CHANNELS;
 
 use serial;
@@ -52,8 +52,7 @@ pub struct DMXSerial {
     // Array of DMX-Values which are written to the Serial-Port
     channels: ArcRwLock<[u8; DMX_CHANNELS]>,
     // Connection to the Agent-Thread, if this is dropped the Agent-Thread will stop
-    agent: mpsc::Sender<()>,
-    agent_rec: mpsc::Receiver<()>,
+    agent: AgentCommunication::<()>,
 
     // Mode
     is_sync: ArcRwLock<bool>,
@@ -102,15 +101,14 @@ impl DMXSerial {
     /// 
     pub fn open<T: AsRef<OsStr> + ?Sized>(port: &T) -> Result<DMXSerial, serial::Error> {
 
-        let (handler, agent_rec) = mpsc::sync_channel(0);
-        let (agent, handler_rec) = mpsc::channel();
+        let (handler, agent_rx) = mpsc::sync_channel(0);
+        let (agent_tx, handler_rec) = mpsc::channel();
 
         // channel default created here!
         let dmx = DMXSerial {
             name: port.as_ref().to_string_lossy().to_string(),
             channels: ArcRwLock::new([0; DMX_CHANNELS]),
-            agent,
-            agent_rec,
+            agent: AgentCommunication::new(agent_tx, agent_rx),
             is_sync: ArcRwLock::new(false),
             min_time_break_to_break: ArcRwLock::new(time::Duration::from_micros(22_700))};
 
@@ -123,16 +121,21 @@ impl DMXSerial {
                     eprintln!("Failed to set thread priority: \"{:?}\". Continuing anyways...", e)
                 });
                 loop {
+                    // This can be unwrapped since the values can't be dropped while the thread is running
                     if is_sync_view.read().unwrap().clone() {
                         handler_rec.recv().unwrap();
                     }
 
                     let channels = channel_view.read().unwrap().clone();
 
-                    agent.send_dmx_packet(channels).unwrap();
-                    match handler.try_send(()) {
-                        Err(mpsc::TrySendError::Disconnected(_)) => break,
-                        _ => {}
+                    // If an error occurs, the thread will stop
+                    if let Err(_) = agent.send_dmx_packet(channels) {
+                        break;
+                    }
+
+                    //If the channel is dropped by the other side, the thread will stop
+                    if let Err(mpsc::TrySendError::Disconnected(_)) = handler.try_send(()) {
+                        break;
                     }
                 }
         });
@@ -163,7 +166,16 @@ impl DMXSerial {
         Ok(dmx)
     }
 
-
+    /// Reopens the [DMXSerial] on the same [`path`].
+    /// 
+    /// It keeps the current [`channel`] values.
+    pub fn reopen(&mut self) -> Result<(), serial::Error> {
+        let channels = self.get_channels();
+        let new_dmx = DMXSerial::open(&self.name)?;
+        *self = new_dmx;
+        self.set_channels(channels);
+        Ok(())
+    }
     /// Gets the name of the Path on which the [DMXSerial] is opened.
     /// 
     ///  # Example
@@ -199,8 +211,9 @@ impl DMXSerial {
     /// # }
     /// ```
     /// 
-    pub fn set_channel(&mut self, channel: usize, value: u8) -> Result<(), DMXError> {
+    pub fn set_channel(&mut self, channel: usize, value: u8) -> Result<(), DMXChannelValidityError> {
         check_valid_channel(channel)?;
+        // RwLock can be unwrapped here
         let mut channels = self.channels.write().unwrap();
         channels[channel - 1] = value;
         Ok(())
@@ -225,6 +238,7 @@ impl DMXSerial {
     /// ```
     /// 
     pub fn set_channels(&mut self, channels: [u8; DMX_CHANNELS]) {
+        // RwLock can be unwrapped here
         *self.channels.write().unwrap() = channels;
     }
 
@@ -248,8 +262,9 @@ impl DMXSerial {
     /// # }
     /// ```
     /// 
-    pub fn get_channel(&self, channel: usize) -> Result<u8, DMXError> {
+    pub fn get_channel(&self, channel: usize) -> Result<u8, DMXChannelValidityError> {
         check_valid_channel(channel)?;
+        // RwLock can be unwrapped here
         let channels = self.channels.read().unwrap();
         Ok(channels[channel - 1])
     }
@@ -271,6 +286,7 @@ impl DMXSerial {
     /// # }
     /// 
     pub fn get_channels(&self) -> [u8; DMX_CHANNELS] {
+        // RwLock can be unwrapped here
         self.channels.read().unwrap().clone()
     }
 
@@ -292,11 +308,13 @@ impl DMXSerial {
     /// ```
     /// 
     pub fn reset_channels(&mut self) {
+        // RwLock can be unwrapped here
         self.channels.write().unwrap().fill(0);
     }
 
-    fn wait_for_update(&self) {
-        self.agent_rec.recv().unwrap();
+    fn wait_for_update(&self) -> Result<(), DMXDisconnectionError> {
+        self.agent.rx.recv().map_err(|_| DMXDisconnectionError)?;
+        Ok(())
     }
     
     /// Updates the DMX data.
@@ -311,34 +329,39 @@ impl DMXSerial {
     /// 
     /// [Basic Usage]: #example-1
     /// 
-    pub fn update(&mut self) {
-        self.update_async();
-        self.wait_for_update();
+    pub fn update(&mut self) -> Result<(), DMXDisconnectionError> {
+        self.update_async()?;
+        self.wait_for_update().map_err(|_| DMXDisconnectionError)?;
+        Ok(())
     }
 
     /// Updates the DMX data but returns immediately.
     /// 
     /// Useless in **async** mode.
     /// 
-    pub fn update_async(&self) {
-        self.agent.send(()).unwrap();
+    pub fn update_async(&self) -> Result<(), DMXDisconnectionError> {
+        self.agent.tx.send(()).map_err(|_| DMXDisconnectionError)?;
+        Ok(())
     }
 
     /// Sets the DMX mode to **sync**.
     /// 
     pub fn set_sync(&mut self) {
+        // RwLock can be unwrapped here
         *self.is_sync.write().unwrap() = true;
     }
 
     /// Sets the DMX mode to **async**.
     ///     
     pub fn set_async(&mut self) {
+        // RwLock can be unwrapped here
         *self.is_sync.write().unwrap() = false;
     }
 
     /// Returns `true` if the DMX mode is **sync**.
     ///     
     pub fn is_sync(&self) -> bool {
+        // RwLock can be unwrapped here
         self.is_sync.read().unwrap().clone()
     }
 
@@ -364,6 +387,7 @@ impl DMXSerial {
     /// 
     /// [DMX512-Standard]: https://www.erwinrol.com/page/articles/dmx512/
     pub fn set_packet_time(&mut self, time: time::Duration) {
+        // RwLock can be unwrapped here
         self.min_time_break_to_break.write().unwrap().clone_from(&time);
     }
 
@@ -372,11 +396,44 @@ impl DMXSerial {
     /// [`Duration`]: time::Duration
     /// 
     pub fn get_packet_time(&self) -> time::Duration {
+        // RwLock can be unwrapped here
         self.min_time_break_to_break.read().unwrap().clone()
     }
 
+    /// Checks if the [`DMXSerial`] device is still connected.
+    ///
+    /// # Example
+    /// 
+    /// Basic usage:
+    /// 
+    /// ```
+    /// # use open_dmx::DMXSerial;
+    /// # fn main() {
+    /// # let mut dmx = DMXSerial::open("COM3").unwrap();
+    /// assert!(dmx.check_agent().is_ok()); // If not, the device got disconnected
+    /// # }
+    pub fn check_agent(&self) -> Result<(), DMXDisconnectionError> {
+        if let Err(mpsc::TryRecvError::Disconnected) = self.agent.rx.try_recv() {
+            return Err(DMXDisconnectionError);
+        }
+        Ok(())
+    }
 }
 
+#[derive(Debug)]
+struct AgentCommunication<T> {
+    pub tx: mpsc::Sender<T>,
+    pub rx: mpsc::Receiver<T>,
+}
+
+impl<T> AgentCommunication<T> {
+    pub fn new(tx: mpsc::Sender<T>, rx: mpsc::Receiver<T>) -> AgentCommunication<T> {
+        AgentCommunication {
+            tx,
+            rx,
+        }
+    }
+}
 
 struct DMXSerialAgent {
     port: serial::SystemPort,
@@ -386,7 +443,7 @@ struct DMXSerialAgent {
 impl DMXSerialAgent {
 
     pub fn open<T: AsRef<OsStr> + ?Sized>(port: &T, min_b2b: ReadOnly<time::Duration>) -> Result<DMXSerialAgent, serial::Error> {
-        let port = serial::SystemPort::open(port)?;
+        let port = serial::open(port)?;
         let dmx = DMXSerialAgent {
             port,
             min_b2b,
