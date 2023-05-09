@@ -443,7 +443,7 @@ struct DMXSerialAgent {
 impl DMXSerialAgent {
 
     pub fn open<T: AsRef<OsStr> + ?Sized>(port: &T, min_b2b: ReadOnly<time::Duration>) -> Result<DMXSerialAgent, serial::Error> {
-        let port = serial::SystemPort::open(port)?;
+        let port = serial::open(port)?;
         let dmx = DMXSerialAgent {
             port,
             min_b2b,
