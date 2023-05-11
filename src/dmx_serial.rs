@@ -123,7 +123,10 @@ impl DMXSerial {
                 loop {
                     // This can be unwrapped since the values can't be dropped while the thread is running
                     if is_sync_view.read().unwrap().clone() {
-                        handler_rec.recv().unwrap();
+                        if handler_rec.recv().is_err() {
+                            // If the channel is dropped by the other side, the thread will stop
+                            break;
+                        }
                     }
 
                     let channels = channel_view.read().unwrap().clone();
