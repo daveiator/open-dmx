@@ -1,6 +1,6 @@
 [package]
 name = "open_dmx"
-description = "A wrapper around the serial library to send DMX data over a serial port"
+description = "A wrapper around the serialport library to send DMX data over a serial port"
 authors = ["David Bühler"]
 license = "MIT"
 repository = "https://github.com/daveiator/open-dmx"
@@ -8,7 +8,7 @@ keywords = ["dmx", "serial","open_dmx","lighting", "enttec"]
 categories = ["api-bindings","multimedia","hardware-support"]
 edition = "2021"
 
-version = "1.0.1"
+version = "1.1.0"
 
 [dependencies]
 serialport = "4.3"
