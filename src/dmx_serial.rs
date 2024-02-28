@@ -7,32 +7,12 @@ use crate::check_valid_channel;
 use crate::error::{DMXDisconnectionError, DMXChannelValidityError};
 use crate::DMX_CHANNELS;
 
-use serial;
-use serial::SerialPort;
+use serialport::SerialPort;
 
 use std::time;
 use std::io::Write;
-use std::ffi::OsStr;
 use std::thread;
 use std::sync::mpsc;
-
-// Holds the serial port settings for the Break-Signals
-const BREAK_SETTINGS: serial::PortSettings = serial::PortSettings {
-    baud_rate: serial::Baud57600,
-    char_size: serial::Bits7,
-    parity: serial::ParityNone,
-    stop_bits: serial::Stop1,
-    flow_control: serial::FlowNone,
-};
-
-// Holds the serial port settings for the Data-Signals
-const DMX_SETTINGS: serial::PortSettings = serial::PortSettings {
-    baud_rate: serial::BaudOther(250_000),
-    char_size: serial::Bits8,
-    parity: serial::ParityNone,
-    stop_bits: serial::Stop2,
-    flow_control: serial::FlowNone,
-};
 
 // Sleep duration between sending the break and the data
 const TIME_BREAK_TO_DATA: time::Duration = time::Duration::new(0, 136_000);
@@ -99,20 +79,20 @@ impl DMXSerial {
     /// }
     /// ```
     /// 
-    pub fn open<T: AsRef<OsStr> + ?Sized>(port: &T) -> Result<DMXSerial, serial::Error> {
+    pub fn open(port: &str) -> Result<DMXSerial, serialport::Error> {
 
         let (handler, agent_rx) = mpsc::sync_channel(0);
         let (agent_tx, handler_rec) = mpsc::channel();
 
         // channel default created here!
         let dmx = DMXSerial {
-            name: port.as_ref().to_string_lossy().to_string(),
+            name: port.to_string(),
             channels: ArcRwLock::new([0; DMX_CHANNELS]),
             agent: AgentCommunication::new(agent_tx, agent_rx),
             is_sync: ArcRwLock::new(false),
             min_time_break_to_break: ArcRwLock::new(time::Duration::from_micros(22_700))};
 
-        let mut agent = DMXSerialAgent::open(port, dmx.min_time_break_to_break.read_only())?;
+        let mut agent = DMXSerialAgent::open(&port, dmx.min_time_break_to_break.read_only())?;
         let channel_view = dmx.channels.read_only();
         let is_sync_view = dmx.is_sync.read_only();
         let _ = thread::spawn(move || {
@@ -163,7 +143,7 @@ impl DMXSerial {
     ///         dmx.update();
     ///     }
     /// }
-    pub fn open_sync(port: &str) -> Result<DMXSerial, serial::Error> {
+    pub fn open_sync(port: &str) -> Result<DMXSerial, serialport::Error> {
         let mut dmx = DMXSerial::open(port)?;
         dmx.set_sync();
         Ok(dmx)
@@ -172,7 +152,7 @@ impl DMXSerial {
     /// Reopens the [DMXSerial] on the same [`path`].
     /// 
     /// It keeps the current [`channel`] values.
-    pub fn reopen(&mut self) -> Result<(), serial::Error> {
+    pub fn reopen(&mut self) -> Result<(), serialport::Error> {
         let channels = self.get_channels();
         let new_dmx = DMXSerial::open(&self.name)?;
         *self = new_dmx;
@@ -439,33 +419,43 @@ impl<T> AgentCommunication<T> {
 }
 
 struct DMXSerialAgent {
-    port: serial::SystemPort,
+    port: Box<dyn SerialPort>,
     min_b2b: ReadOnly<time::Duration>,
 }
 
 impl DMXSerialAgent {
 
-    pub fn open<T: AsRef<OsStr> + ?Sized>(port: &T, min_b2b: ReadOnly<time::Duration>) -> Result<DMXSerialAgent, serial::Error> {
-        let port = serial::open(port)?;
+    pub fn open (port: &str, min_b2b: ReadOnly<time::Duration>) -> Result<DMXSerialAgent, serialport::Error> {
+        let port = serialport::new(port, 200000).open()?;
         let dmx = DMXSerialAgent {
             port,
             min_b2b,
         };
         Ok(dmx)
     }
-    fn send_break(&mut self) -> serial::Result<()> {
-        self.port.configure(&BREAK_SETTINGS)?;
+    fn send_break(&mut self) -> serialport::Result<()> {
+        self.port.set_baud_rate(57600)?;
+        self.port.set_data_bits(serialport::DataBits::Seven)?;
+        self.port.set_stop_bits(serialport::StopBits::One)?;
+        self.port.set_parity(serialport::Parity::None)?;
+        self.port.set_flow_control(serialport::FlowControl::None)?;
+
         self.port.write(&[0x00])?;
         Ok(())
     }
 
-    fn send_data(&mut self, data: &[u8]) -> serial::Result<()> {
-        self.port.configure(&DMX_SETTINGS)?;
+    fn send_data(&mut self, data: &[u8]) -> serialport::Result<()> {
+        self.port.set_baud_rate(250000)?;
+        self.port.set_data_bits(serialport::DataBits::Eight)?;
+        self.port.set_stop_bits(serialport::StopBits::Two)?;
+        self.port.set_parity(serialport::Parity::None)?;
+        self.port.set_flow_control(serialport::FlowControl::None)?;
+
         self.port.write(data)?;
         Ok(())
     }
     
-    pub fn send_dmx_packet(&mut self, channels: [u8; DMX_CHANNELS]) -> serial::Result<()> {
+    pub fn send_dmx_packet(&mut self, channels: [u8; DMX_CHANNELS]) -> serialport::Result<()> {
         let start = time::Instant::now();
         self.send_break()?;
         thread::sleep(TIME_BREAK_TO_DATA);
