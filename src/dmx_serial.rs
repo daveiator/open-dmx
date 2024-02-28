@@ -426,39 +426,29 @@ struct DMXSerialAgent {
 impl DMXSerialAgent {
 
     pub fn open (port: &str, min_b2b: ReadOnly<time::Duration>) -> Result<DMXSerialAgent, serialport::Error> {
-        let port = serialport::new(port, 200000).open()?;
+        let port = serialport::new(port, 250000)
+        .data_bits(serialport::DataBits::Eight)
+        .stop_bits(serialport::StopBits::Two)
+        .parity(serialport::Parity::None)
+        .flow_control(serialport::FlowControl::None)
+        .open()?;
         let dmx = DMXSerialAgent {
             port,
             min_b2b,
         };
         Ok(dmx)
     }
-    fn send_break(&mut self) -> serialport::Result<()> {
-        self.port.set_baud_rate(57600)?;
-        self.port.set_data_bits(serialport::DataBits::Seven)?;
-        self.port.set_stop_bits(serialport::StopBits::One)?;
-        self.port.set_parity(serialport::Parity::None)?;
-        self.port.set_flow_control(serialport::FlowControl::None)?;
-
-        self.port.write(&[0x00])?;
-        Ok(())
-    }
 
     fn send_data(&mut self, data: &[u8]) -> serialport::Result<()> {
-        self.port.set_baud_rate(250000)?;
-        self.port.set_data_bits(serialport::DataBits::Eight)?;
-        self.port.set_stop_bits(serialport::StopBits::Two)?;
-        self.port.set_parity(serialport::Parity::None)?;
-        self.port.set_flow_control(serialport::FlowControl::None)?;
-
         self.port.write(data)?;
         Ok(())
     }
     
     pub fn send_dmx_packet(&mut self, channels: [u8; DMX_CHANNELS]) -> serialport::Result<()> {
         let start = time::Instant::now();
-        self.send_break()?;
+        self.port.set_break()?;
         thread::sleep(TIME_BREAK_TO_DATA);
+        self.port.clear_break()?;
         let mut prefixed_data = [0; 513];// 1 start byte + 512 channels
         prefixed_data[1..].copy_from_slice(&channels);
         self.send_data(&prefixed_data)?;
