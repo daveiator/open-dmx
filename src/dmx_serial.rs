@@ -23,7 +23,7 @@ const TIME_BREAK_TO_DATA: time::Duration = time::Duration::new(0, 136_000);
 /// 
 /// It uses the RS-485 standard *(aka. Open DMX)* to send **DMX data** over a [SerialPort]. 
 /// 
-/// [SerialPort]: serial::SystemPort
+/// [SerialPort]: serialport::SerialPort
 ///
 #[derive(Debug)]
 pub struct DMXSerial {
@@ -50,7 +50,7 @@ impl DMXSerial {
     /// - **Linux**: `/dev/ttyUSB0`
     /// 
     /// [DMX-Interface]: DMXSerial
-    /// [`path`]: std::ffi::OsStr
+    /// [`path`]: std::str
     /// 
     /// <br>
     /// 
@@ -63,7 +63,7 @@ impl DMXSerial {
     /// 
     /// 
     /// [`set functions`]: DMXSerial::set_channel
-    /// [SerialPort]: serial::SystemPort
+    /// [SerialPort]: serialport::SerialPort
     /// 
     /// # Example
     /// 
@@ -152,6 +152,10 @@ impl DMXSerial {
     /// Reopens the [DMXSerial] on the same [`path`].
     /// 
     /// It keeps the current [`channel`] values.
+    ///
+    /// [`path`]: std::str
+    /// [`channel`]: usize
+    ///
     pub fn reopen(&mut self) -> Result<(), serialport::Error> {
         let channels = self.get_channels();
         let new_dmx = DMXSerial::open(&self.name)?;
